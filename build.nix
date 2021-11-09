@@ -13,9 +13,6 @@ with nixpkgs;
 pkgs.mkShell {
   nativeBuildInputs = [
     binaryen
-    git
-    python3
-    jetbrains.idea-community
     (rust_channel.override { extensions = [ "cargo" "rustc" "rust-std" ];})
     wasm-bindgen-cli
   ];
