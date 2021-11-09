@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+set -e
+
+cli_name=${0##*/}
+project_name="wasm-hello"
+
+cli_help() {
+  echo "
+$cli_name
+Usage: $cli_name [command]
+Commands:
+  build, b     Compile the project
+  help, h      Display help on a specific subcommand
+  serve, s     Serve the file using an HTTP server
+
+See '$cli_name help <command>' for more information on a specific command
+"
+}
+
+help_help() {
+  echo "
+Prints the help of the given subcommand
+
+USAGE:
+    $cli_name help [subcommand]
+
+ARGS:
+    <subcommand>    The subcommand whose help message to display
+"
+}
+
+help_build() {
+  echo "
+Builds the project
+
+USAGE:
+    $cli_name build [options]
+
+OPTIONS:
+    --help, -h      Display this help message
+    --release, -r   Build with optimization
+"
+}
+
+help_clean() {
+  echo "
+Removes generated artifacts
+
+USAGE:
+    $cli_name clean
+"
+}
+
+help_serve() {
+  echo "
+Serves the file using an HTTP server
+
+USAGE:
+    $cli_name serve [options]
+
+OPTIONS:
+    --port, -p <PORT>    Serve the file on port <PORT>. Default: 8080
+"
+}
+
+command_help() {
+  commend="help"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        help_help
+        exit
+        ;;
+      help|h)
+        command="help"
+        shift
+        ;;
+      build|b)
+        command="build"
+        shift
+        ;;
+      clean|c)
+        command="clean"
+        shift
+        ;;
+      serve|s)
+        command="serve"
+        shift
+        ;;
+      *)
+        >&2 echo "unrecognized argument: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  help_${command}
+}
+
+command_build() {
+  ARGS=()
+  mode="debug"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        help_build
+        exit
+        ;;
+      -r|--release)
+        ARGS+=("--release")
+        mode="release"
+        shift
+        ;;
+      *)
+        >&2 echo "unrecognized argument: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  rm -rf web
+  cp -R html web
+
+  cargo build $ARGS
+  wasm-bindgen target/wasm32-unknown-unknown/${mode}/${project_name}.wasm \
+    --no-typescript \
+    --target web \
+    --out-dir web \
+
+  if [[ $mode == "release" ]]; then
+    wasm-opt web/${project_name}_bg.wasm \
+      -Os \
+      -o web/${project_name}_bg.wasm
+  fi
+}
+
+command_clean() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        help_clean
+        exit
+        ;;
+      *)
+        >&2 echo "unrecognized argument: $1"
+        exit 1
+        ;;
+    esac
+  done
+
+  cargo clean
+  rm -rf ./web
+}
+
+command_serve() {
+  port=8080
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        help_serve
+        exit
+        ;;
+      -p|--port)
+        if [[ $# -eq 1 ]]; then
+          >&2 echo "missing value"
+          exit 1
+        fi
+
+        port=$2
+        shift
+        shift
+        ;;
+      *)
+        >&2 echo "unrecognized argument: $1"
+        exit 1
+      ;;
+    esac
+  done
+
+  python -m http.server --directory web ${port}
+}
+
+if [[ $# -eq 0 ]]; then
+  cli_help
+else
+  case "$1" in
+    help|h)
+      command_help ${@:2}
+      ;;
+    build|b)
+      command_build ${@:2}
+      ;;
+    clean|c)
+      command_clean ${@:2}
+      ;;
+    serve|s)
+      command_serve ${@:2}
+      ;;
+    *)
+      >&2 echo "no such subcommand: $1"
+      exit 1
+      ;;
+  esac
+fi

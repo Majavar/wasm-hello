@@ -1,0 +1,6 @@
+[toolchain]
+channel = "stable"
+date = "01-11-2021"
+components = ["rust-src", "rustc-dev", "llvm-tools-preview"]
+target = "wasm32-unknown-unknown"
+
